@@ -1,0 +1,197 @@
+------------------------------------------------------------------------
+Specs
+------------------------------------------------------------------------
+Lenovo Thinkpad t450s
+i5-5500u cpu
+20gb ram
+500g Samsung 850 EVO ssd
+2x MyDigitalSSD 42mm m.2 ngff 2242
+------------------------------------------------------------------------
+Part01: Creating Patitions
+------------------------------------------------------------------------
+*Drive has GPT partition table
+*Securely wiped and zeroed
+
+Create two partitions
+
+# cgdisk /dev/sda
+sda1, type: ef00 EFI System - boot drive     - 1024MB, non encrypted boot drive
+sda2, type: 8e00 Linux LVM  - crypt_drive_01 - Remaining space will be encrypted
+
+# cgdisk /dev/sdb
+sdb1, type: 8e00 Linux LVM  - crypt_drive_02 - Use all the space for encryption
+
+sdc, Will be used as hackintosh drive
+------------------------------------------------------------------------
+Part02: Encrypting Drives
+------------------------------------------------------------------------
+sda2 encryption
+# cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 luksFormat /dev/sda2
+type capital YES and enter in passphrase
+
+generate 20kb of random data for a keyfile for use with ecrypting and unlocking sdb1 wihtout passphrase
+# dd if=/dev/urandom of=crypt_drive_02 bs=1024 count=20
+keyfile will be named crypt_drive_02 and located in root of usb installing disk
+
+sdb1 full drive encryption
+# cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 --key-file crypt_drive_02 luksFormat /dev/sdb1
+
+------------------------------------------------------------------------
+Part03: Unlocking Drives
+------------------------------------------------------------------------
+unlock sda2
+# cryptsetup luksOpen /dev/sda2 crypt_drive_01
+
+unlock sdb1
+# cryptsetup --key-file crypt_drive_02 luksOpen /dev/sdb1 crypt_drive_02
+
+------------------------------------------------------------------------
+Part03: Creating LVM paritions
+------------------------------------------------------------------------
+
+sda2 - crypt_drive_01, will contain swap and the rest will be used for /
+# lvm pvcreate /dev/mapper/crypt_drive_01               (creating physical volume at /dev/mapper/crypt_drive_01)
+# lvm vgcreate lvm_vol_01 /dev/mapper/crypt_drive_01    (creating LVM volume group lvm_vol_01)
+# lvm pvcreate -L 21GB -n swap lvm_vol_01               (swap drive, same amount as ram for hibernation)
+# lvm pvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,everything else)
+
+sdb1 - crypt_drive_02, this will be mounted as /data, used for backups and backintime snapshots
+# lvm lvm pvcreate /dev/mapper/crypt_drive_02           (creating physical volume at /dev/mapper/crypt_drive_02)
+# lvm vgcreate lvm_vol_02 /dev/mapper/crypt_drive_02    (creating LVM volume group lvm_vol_02)
+# lvm pvcreate -l 100%FREE -n data lvm_vol_02           (backup drive)
+
+------------------------------------------------------------------------
+Part03: Creating FileSystems and Swap
+------------------------------------------------------------------------
+
+# lsblk                                                 (command to list all available drives)
+
+Creating fileSystems on crypt_drive_01
+# mkfs.fat -F32 /dev/sda1                               (boot drive will be fat32, *very important for type to be ef00 and fs is fat32*)
+# mkfs.ext4 /dev/mapper/lvm_vol_01-root                 (ext4 for root)
+# mkswap /dev/mapper/lvm_vol_01-swap                    (making swap partition)
+# swapon /dev/mapper/lvm_vol_01-swap                    (turning swap on)
+# free -h                                               (checking to see if swap is on)
+
+Creating fileSystems on crypt_drive_02
+# mkfs.ext4 /dev/mapper/lvm_vol_02-data
+
+
+------------------------------------------------------------------------
+Part04: Creating and Mounting Directories and installing Arch Linux
+------------------------------------------------------------------------
+
+# mount /dev/mapper/lvm_vol_01-root /mnt                (mount point /mnt/)
+# mkdir /mnt/boot                                       (create boot dir)
+# mkdir /mnt/data                                       (create data dir)
+# mount /dev/sda1 /mnt/boot                             (mount point /mnt/boot)
+# mount /dev/mapper/lvm_vol_02-data                     (mount point /mnt/data)
+
+Ethernet cord was plugged in during initial install, internet worked without additional steps
+# pacstrap /mnt base base-devel                         (install arch linux)
+
+Once installation completes, we will move our keyfile "crypt_drive_02" to a location on /mnt/luks-keys/
+# mkdir /mnt/luks-keys
+# cp crypt_drive_02 /mnt/luks-keys/crypt_drive_02       (copy keyfile to secure location)
+
+------------------------------------------------------------------------
+Part05: Setting Up /data to auto-unlock on boot
+------------------------------------------------------------------------
+
+Find UUID of drive first
+# ls -l /dev/disk/by-uuid                               (list all UUID of mounted drives)
+
+Record UUID for sdb1, I took a picture with my phone
+
+Now we edit the crypttab
+# nano /mnt/etc/crypttab
+
+Add in this line to auto-unlock /data at boot time
+
+data    UUID=47ba317e-5eb4-4f79-8692-43759a9004c8   /luks-keys/crypt_drive_02 luks,allow-discard
+
+Generate fstab
+# genfstab -U /mnt >> /mnt/etc/fstab
+
+Add discard option onto /boot, /dev/mapper/lvm_vol_01-root, and swap
+# nano /etc/fstab
+
+------------------------------------------------------------------------
+Part06: Chrooting into the system and configuring for first boot
+------------------------------------------------------------------------
+
+# arch-chroot /mnt                                      (chrooting into system)
+
+Timezone
+# ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
+
+Generate /etc/localtime
+# hwclock --systohc
+
+Locale Settings for United States
+# nano /etc/locale.gen
+Then uncomment: en.US.UTF UTF-8
+
+Generate locale
+# locale-gen
+
+Set Language Variable
+# echo LANG=en_US.UTF-8 > /etc/locale.conf
+
+Configure hostname
+# echo arch-linux > /etc/hostname
+
+Add matching entry to: /etc/hosts
+# nano /etc/hosts
+127.0.0.1   arch-linux.localdomain  arch-linux      (Add this to /etc/hosts file)
+
+Add hooks to initramfs
+# nano /etc/mkinitcpio.conf
+Add the following hooks in this exact order
+
+keymap encrypt lvm2 resume
+
+should look like this: 
+HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
+
+Generate initial ramdisk environment
+# mkinitcpio -p linux
+
+Set Password for root
+# passwd strong_password
+
+Create User
+# useradd -m -G wheel,storage,audio,power -s /bin/bash username
+
+Set User Password
+# passwd username
+
+Edit sudoers
+# EDITOR=nano visudo
+
+Uncomment: %wheel ALL=(ALL) allow
+
+Systemd-Bootloader Install on UEFI firmware system
+# bootctl install
+
+Bootloader Configuration
+# nano /boot/loader/loader.conf
+Add the following:
+
+default arch
+timeout 1
+editor	0
+
+
+Add entries
+# nano /boot/loader/entries/arch.conf
+Add the following:
+
+title	[[ Arch Linux ]]                                  ( Could basically write anything here )
+linux	/vmlinuz-linux
+initrd  /initramfs-linux.img
+options	cryptdevice=/dev/sda2:crypt_drive_01 root=/dev/mapper/lvm_vol_01-root resume=/dev/mapper/lvm_vol_01-swap rw
+
+Installation Complete. Remove USB installation media and reboot 
+# reboot
+
