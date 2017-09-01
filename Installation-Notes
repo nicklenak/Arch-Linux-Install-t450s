@@ -12,16 +12,18 @@ Part01: Creating Patitions
 *Drive has GPT partition table
 *Securely wiped and zeroed
 
-Create two partitions
-
+List availale block devices
+#lsblk
+GPT partition table drives need to use cgdisk
 # cgdisk /dev/sda
+
 sda1, type: ef00 EFI System - boot drive     - 1024MB, non encrypted boot drive
 sda2, type: 8e00 Linux LVM  - crypt_drive_01 - Remaining space will be encrypted
 
 # cgdisk /dev/sdb
 sdb1, type: 8e00 Linux LVM  - crypt_drive_02 - Use all the space for encryption
 
-sdc, Will be used as hackintosh drive
+sdc, Will be used as a hackintosh/OS's test drive
 ------------------------------------------------------------------------
 Part02: Encrypting Drives
 ------------------------------------------------------------------------
@@ -29,9 +31,9 @@ sda2 encryption
 # cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 luksFormat /dev/sda2
 type capital YES and enter in passphrase
 
-generate 20kb of random data for a keyfile for use with ecrypting and unlocking sdb1 wihtout passphrase
+generate 20kb of random data for a keyfile for use with ecrypting and unlocking sdb1 wihtout a passphrase
 # dd if=/dev/urandom of=crypt_drive_02 bs=1024 count=20
-keyfile will be named crypt_drive_02 and located in root of usb installing disk
+keyfile will be named crypt_drive_02 and located in root of usb installation disk
 
 sdb1 full drive encryption
 # cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 --key-file crypt_drive_02 luksFormat /dev/sdb1
@@ -53,32 +55,31 @@ sda2 - crypt_drive_01, will contain swap and the rest will be used for /
 # lvm pvcreate /dev/mapper/crypt_drive_01               (creating physical volume at /dev/mapper/crypt_drive_01)
 # lvm vgcreate lvm_vol_01 /dev/mapper/crypt_drive_01    (creating LVM volume group lvm_vol_01)
 # lvm pvcreate -L 21GB -n swap lvm_vol_01               (swap drive, same amount as ram for hibernation)
-# lvm pvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,everything else)
+# lvm pvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,and everything else)
 
 sdb1 - crypt_drive_02, this will be mounted as /data, used for backups and backintime snapshots
 # lvm lvm pvcreate /dev/mapper/crypt_drive_02           (creating physical volume at /dev/mapper/crypt_drive_02)
 # lvm vgcreate lvm_vol_02 /dev/mapper/crypt_drive_02    (creating LVM volume group lvm_vol_02)
-# lvm pvcreate -l 100%FREE -n data lvm_vol_02           (backup drive)
+# lvm pvcreate -l 100%FREE -n data lvm_vol_02           (backup/snapshots drive)
 
 ------------------------------------------------------------------------
 Part03: Creating FileSystems and Swap
 ------------------------------------------------------------------------
 
-# lsblk                                                 (command to list all available drives)
+# lsblk
 
 Creating fileSystems on crypt_drive_01
 # mkfs.fat -F32 /dev/sda1                               (boot drive will be fat32, *very important for type to be ef00 and fs is fat32*)
 # mkfs.ext4 /dev/mapper/lvm_vol_01-root                 (ext4 for root)
 # mkswap /dev/mapper/lvm_vol_01-swap                    (making swap partition)
 # swapon /dev/mapper/lvm_vol_01-swap                    (turning swap on)
-# free -h                                               (checking to see if swap is on)
+# free -h                                               (check to see if swap is on)
 
 Creating fileSystems on crypt_drive_02
 # mkfs.ext4 /dev/mapper/lvm_vol_02-data
 
-
 ------------------------------------------------------------------------
-Part04: Creating and Mounting Directories and installing Arch Linux
+Part04: Creating, Mounting Directories, and installing Arch Linux
 ------------------------------------------------------------------------
 
 # mount /dev/mapper/lvm_vol_01-root /mnt                (mount point /mnt/)
@@ -90,7 +91,7 @@ Part04: Creating and Mounting Directories and installing Arch Linux
 Ethernet cord was plugged in during initial install, internet worked without additional steps
 # pacstrap /mnt base base-devel                         (install arch linux)
 
-Once installation completes, we will move our keyfile "crypt_drive_02" to a location on /mnt/luks-keys/
+Once installation completes, we will move our keyfile "crypt_drive_02" to a location on /mnt
 # mkdir /mnt/luks-keys
 # cp crypt_drive_02 /mnt/luks-keys/crypt_drive_02       (copy keyfile to secure location)
 
@@ -98,7 +99,7 @@ Once installation completes, we will move our keyfile "crypt_drive_02" to a loca
 Part05: Setting Up /data to auto-unlock on boot
 ------------------------------------------------------------------------
 
-Find UUID of drive first
+Find UUID of sdb1 first
 # ls -l /dev/disk/by-uuid                               (list all UUID of mounted drives)
 
 Record UUID for sdb1, I took a picture with my phone
@@ -106,7 +107,7 @@ Record UUID for sdb1, I took a picture with my phone
 Now we edit the crypttab
 # nano /mnt/etc/crypttab
 
-Add in this line to auto-unlock /data at boot time
+Add in this line to auto-unlock /data at boot time:
 
 data    UUID=47ba317e-5eb4-4f79-8692-43759a9004c8   /luks-keys/crypt_drive_02 luks,allow-discard
 
@@ -141,17 +142,18 @@ Set Language Variable
 Configure hostname
 # echo arch-linux > /etc/hostname
 
-Add matching entry to: /etc/hosts
+Add matching entry to:
 # nano /etc/hosts
+
 127.0.0.1   arch-linux.localdomain  arch-linux      (Add this to /etc/hosts file)
 
 Add hooks to initramfs
 # nano /etc/mkinitcpio.conf
-Add the following hooks in this exact order
+Add the following hooks in this exact order:
 
 keymap encrypt lvm2 resume
 
-should look like this: 
+Add in between block and filesystems, should look like this: 
 HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
 
 Generate initial ramdisk environment
@@ -182,12 +184,11 @@ default arch
 timeout 1
 editor	0
 
-
-Add entries
+Add entries and kermel options
 # nano /boot/loader/entries/arch.conf
 Add the following:
 
-title	[[ Arch Linux ]]                                  ( Could basically write anything here )
+title	[[ Arch Linux ]]                                  ( Could basically write anything here, title will show up on boot)
 linux	/vmlinuz-linux
 initrd  /initramfs-linux.img
 options	cryptdevice=/dev/sda2:crypt_drive_01 root=/dev/mapper/lvm_vol_01-root resume=/dev/mapper/lvm_vol_01-swap rw
