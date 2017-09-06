@@ -54,13 +54,13 @@ Part03: Creating LVM paritions
 sda2 - crypt_drive_01, will contain swap and the rest will be used for /
 # lvm pvcreate /dev/mapper/crypt_drive_01               (creating physical volume at /dev/mapper/crypt_drive_01)
 # lvm vgcreate lvm_vol_01 /dev/mapper/crypt_drive_01    (creating LVM volume group lvm_vol_01)
-# lvm pvcreate -L 21GB -n swap lvm_vol_01               (swap drive, same amount as ram for hibernation)
-# lvm pvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,and everything else)
+# lvm lvcreate -L 21GB -n swap lvm_vol_01               (swap drive, same amount as ram for hibernation)
+# lvm lvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,and everything else)
 
 sdb1 - crypt_drive_02, this will be mounted as /data, used for backups and backintime snapshots
 # lvm lvm pvcreate /dev/mapper/crypt_drive_02           (creating physical volume at /dev/mapper/crypt_drive_02)
 # lvm vgcreate lvm_vol_02 /dev/mapper/crypt_drive_02    (creating LVM volume group lvm_vol_02)
-# lvm pvcreate -l 100%FREE -n data lvm_vol_02           (backup/snapshots drive)
+# lvm lvcreate -l 100%FREE -n data lvm_vol_02           (backup/snapshots drive)
 
 ------------------------------------------------------------------------
 Part03: Creating FileSystems and Swap
