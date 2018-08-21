@@ -59,10 +59,10 @@ lvm-vg02 encryption
 cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 luksFormat /dev/mapper/lvm-vg02-data
 
 Add in keyfile after creating passphrase
-# cryptsetup luksAddKey  /dev/mapper/lvm-vg02-data keyfile
+# cryptsetup luksAddKey  /dev/mapper/data keyfile
 
 unlock lvm-vg02-data
-# cryptsetup --key-file lvm-vg02-key luksOpen /dev/mapper/lvm-vg02-data lvm-vg02-data-unlocked
+# cryptsetup --key-file lvm-vg02-key luksOpen /dev/mapper/lvm-vg02-data data
 
 Creating filesysystems and swap
 
@@ -74,14 +74,14 @@ Creating fileSystems on /dev/sda
 # free -h                                               (check to see if swap is on)
 
 Creating fileSystems on lvm-vg02-data-unlocked
-# mkfs.ext4 /dev/mapper/lvm_vol_02-data-unlocked
+# mkfs.ext4 /dev/mapper/data
 
 Create, mount, and install Arch Linux
 # mount /dev/mapper/lvm--vg01-root /mnt                (mount point /mnt/)
 # mkdir /mnt/boot                                       (create boot dir)
 # mkdir /mnt/data                                       (create data dir)
 # mount /dev/sda1 /mnt/boot                             (mount point /mnt/boot)
-# mount /dev/mapper/lvm-vg02-data-unlocked              (mount point /mnt/data)
+# mount /dev/mapper/data /mnt/data              (mount point /mnt/data)
 
 
 Ethernet cord was plugged in during initial install, internet worked without additional steps
@@ -105,7 +105,7 @@ Install arch linux base and wifi-menu
 
 Once installation completes, we will move our keyfile "lvm-vg02-key" to a location on /mnt/luk-keys
 # mkdir /mnt/luks-keys
-# mv lvm-vg02-keys /mnt/luks-keys/2                       (copy keyfile to secure location)
+# mv lvm-vg02-key /mnt/luk-keys/                       (copy keyfile to secure location)
 
 Make a backup of the key
 
@@ -114,14 +114,15 @@ cp lvm-vg02-key lvm-vg02-key-backup
 Find UUID of lvm-vg02-data-unlocked
 # ls -al /dev/mapper                                      (locate lvm-vg02-data-unlocked label: dm-4)
 # ls -al /dev/disk/by-uuid
+# lsblk -o name,uuid,mountpoint
 
 Record UUID for dm-4
 
 Add entry in crypttab
 # nano /mnt/etc/crypttab
 
-Add in this line to auto-unlock lvm-vg02-data at boot time:
-data    UUID=uuid in here   /luks-keys/lvm-vg02-key luks,allow-discard
+Add in this line to auto-unlock lvm--vg02-data at boot time:
+data    UUID=uuid in here   /luk-keys/lvm-vg02-key luks,allow-discard
 
 
 Generate fstab
