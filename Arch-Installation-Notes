@@ -6,120 +6,130 @@ i5-5300u cpu
 20gb ram
 500g Samsung 850 EVO ssd
 2x MyDigitalSSD 42mm m.2 ngff 2242
+
+Goal: Install Arch Linux enabling encryption on all drive and enabling hibernation support
+
 ------------------------------------------------------------------------
-Part01: Creating Patitions
+Creating Patitions and planning layout
 ------------------------------------------------------------------------
-*Drive has GPT partition table
-*Securely wiped and zeroed
+-Using GPT partition table
+-Drives should be wiped and zeroed using Ultimate Boot CD
 
 List availale block devices
-#lsblk
+# lsblk
+
+Create boot partition and lvm-vg01 swap and root for 500gb ssd. Lvm on luks will allow the encrypt hook to decrypt both root and swap
+for hibernation/resume from suspend.
 GPT partition table drives need to use cgdisk
 # cgdisk /dev/sda
 
-sda1, type: ef00 EFI System - boot drive     - 1024MB, non encrypted boot drive
-sda2, type: 8e00 Linux LVM  - crypt_drive_01 - Remaining space will be encrypted
+sda1, type: ef00 EFI System, Label: boot drive     - 1024MB, non encrypted boot drive
+sda2, type: 8e00 Linux LVM,  Label: vg01-disk01 - Remaining space will be encrypted first then we'll create lvm volumes
 
-# cgdisk /dev/sdb
-sdb1, type: 8e00 Linux LVM  - crypt_drive_02 - Use all the space for encryption
-
-sdc, Will be used as a hackintosh/OS's test drive
-------------------------------------------------------------------------
-Part02: Encrypting Drives
-------------------------------------------------------------------------
-sda2 encryption
+sda2 partition encryption
 # cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 luksFormat /dev/sda2
 type capital YES and enter in passphrase
 
-generate 20kb of random data for a keyfile for use with ecrypting and unlocking sdb1 wihtout a passphrase
-# dd if=/dev/urandom of=crypt_drive_02 bs=1024 count=20
-keyfile will be named crypt_drive_02 and located in root of usb installation disk
+Open sda2 for lvm setup
+# cryptsetup luksOpen /dev/sda2 crypt-disk01
 
-sdb1 full drive encryption
-# cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 --key-file crypt_drive_02 luksFormat /dev/sdb1
+sda2 - crypt-disk01, will contain swap and the rest will be used for /
+# pvcreate /dev/mapper/crypt-disk01               (creating physical volume at /dev/mapper/crypt-disk01)
+# vgcreate lvm-vg01 /dev/mapper/crypt-disk01      (creating LVM volume group lvm-vg01)
+# lvcreate -L 24GB -n swap lvm-vg01               (swap drive, same amount as ram for hibernation)
+# lvcreate -l 100%FREE -n root lvm-vg01           (keeping it simple, this will be root,home,and everything else)
 
-------------------------------------------------------------------------
-Part03: Unlocking Drives
-------------------------------------------------------------------------
-unlock sda2
-# cryptsetup luksOpen /dev/sda2 crypt_drive_01
 
-unlock sdb1
-# cryptsetup --key-file crypt_drive_02 luksOpen /dev/sdb1 crypt_drive_02
+Creating lvm-vg02 using luks on lvm spanning multiple disks, will be mounted in /data
+# cgdisk /dev/sdb
+sdb1, type: 8e00 Linux LVM,  Label: lvm-vg02-disk01 - Using all the space for encryption
+# cgdisk /dev/sdc
+sdb1, type: 8e00 Linux LVM,  Label: lvm-vg02-disk02 - Using all the space for encryption
 
-------------------------------------------------------------------------
-Part03: Creating LVM paritions
-------------------------------------------------------------------------
+Creating lvm-vg02 first
+# pvcreate /dev/sdb1 /dev/sdc1                     (creating lvm physical volume for sdb1 and sdc1)
+# vgcreate lvm-vg02 /dev/sdb1 /sdc1                (creating LVM volume group lvm-vg02 spanning disk sdb1 and sdc1)
+# lvcreate -l 100%FREE -n data lvm-vg02            (backup/snapshots drive)
 
-sda2 - crypt_drive_01, will contain swap and the rest will be used for /
-# lvm pvcreate /dev/mapper/crypt_drive_01               (creating physical volume at /dev/mapper/crypt_drive_01)
-# lvm vgcreate lvm_vol_01 /dev/mapper/crypt_drive_01    (creating LVM volume group lvm_vol_01)
-# lvm lvcreate -L 21GB -n swap lvm_vol_01               (swap drive, same amount as ram for hibernation)
-# lvm lvcreate -l 100%FREE -n root lvm_vol_01           (keep it simple, this will be root,home,and everything else)
+Generate 20kb of random data for a keyfile for use with encrypting and unlocking lvm-vg02 with a keyfile. 
+Which will be named lvm-vg02-data-key and located in root of usb installation disk
+# dd if=/dev/urandom of=lvm-vg02-key bs=1024 count=20
 
-sdb1 - crypt_drive_02, this will be mounted as /data, used for backups and backintime snapshots
-# lvm lvm pvcreate /dev/mapper/crypt_drive_02           (creating physical volume at /dev/mapper/crypt_drive_02)
-# lvm vgcreate lvm_vol_02 /dev/mapper/crypt_drive_02    (creating LVM volume group lvm_vol_02)
-# lvm lvcreate -l 100%FREE -n data lvm_vol_02           (backup/snapshots drive)
+lvm-vg02 encryption
+cryptsetup -c aes-xts-plain64 -s 512 -h sha512 -i 5000 luksFormat /dev/mapper/lvm-vg02-data
 
-------------------------------------------------------------------------
-Part03: Creating FileSystems and Swap
-------------------------------------------------------------------------
+Add in keyfile after creating passphrase
+# cryptsetup luksAddKey  /dev/mapper/lvm-vg02-data keyfile
 
-# lsblk
+unlock lvm-vg02-data
+# cryptsetup --key-file lvm-vg02-key luksOpen /dev/mapper/lvm-vg02-data lvm-vg02-data-unlocked
 
-Creating fileSystems on crypt_drive_01
+Creating filesysystems and swap
+
+Creating fileSystems on /dev/sda
 # mkfs.fat -F32 /dev/sda1                               (boot drive will be fat32, *very important for type to be ef00 and fs is fat32*)
-# mkfs.ext4 /dev/mapper/lvm_vol_01-root                 (ext4 for root)
-# mkswap /dev/mapper/lvm_vol_01-swap                    (making swap partition)
-# swapon /dev/mapper/lvm_vol_01-swap                    (turning swap on)
+# mkfs.ext4 /dev/mapper/lvm--vg01-root                 (ext4 for root)
+# mkswap /dev/mapper/lvm--vg01-swap                    (making swap partition)
+# swapon /dev/mapper/lvm--vg01-swap                    (turning swap on)
 # free -h                                               (check to see if swap is on)
 
-Creating fileSystems on crypt_drive_02
-# mkfs.ext4 /dev/mapper/lvm_vol_02-data
+Creating fileSystems on lvm-vg02-data-unlocked
+# mkfs.ext4 /dev/mapper/lvm_vol_02-data-unlocked
 
-------------------------------------------------------------------------
-Part04: Creating, Mounting Directories, and installing Arch Linux
-------------------------------------------------------------------------
-
-# mount /dev/mapper/lvm_vol_01-root /mnt                (mount point /mnt/)
+Create, mount, and install Arch Linux
+# mount /dev/mapper/lvm--vg01-root /mnt                (mount point /mnt/)
 # mkdir /mnt/boot                                       (create boot dir)
 # mkdir /mnt/data                                       (create data dir)
 # mount /dev/sda1 /mnt/boot                             (mount point /mnt/boot)
-# mount /dev/mapper/lvm_vol_02-data                     (mount point /mnt/data)
+# mount /dev/mapper/lvm-vg02-data-unlocked              (mount point /mnt/data)
+
 
 Ethernet cord was plugged in during initial install, internet worked without additional steps
-# pacstrap /mnt base base-devel                         (install arch linux)
 
-Once installation completes, we will move our keyfile "crypt_drive_02" to a location on /mnt
+For wifi install stop dhcpcd@network-interface
+# systemctl stop dhcpcd@enp0s25.service
+
+Get wifi interface name
+# ip link
+
+Bring up wifi interface
+# ip link set wlp3s0 up
+
+Scan and connect to wifi network
+# wifi-menu -o
+
+If wifi is not connecting, try temporarily changing your wifi security settings from wpa2 to wpa.
+
+Install arch linux base and wifi-menu
+# pacstrap /mnt base base-devel dialog wpa_supplicant iw intel-ucode
+
+Once installation completes, we will move our keyfile "lvm-vg02-key" to a location on /mnt/luk-keys
 # mkdir /mnt/luks-keys
-# cp crypt_drive_02 /mnt/luks-keys/crypt_drive_02       (copy keyfile to secure location)
+# mv lvm-vg02-keys /mnt/luks-keys/2                       (copy keyfile to secure location)
 
-------------------------------------------------------------------------
-Part05: Setting Up /data to auto-unlock on boot
-------------------------------------------------------------------------
+Make a backup of the key
 
-Find UUID of sdb1 first
-# ls -l /dev/disk/by-uuid                               (list all UUID of mounted drives)
+cp lvm-vg02-key lvm-vg02-key-backup
 
-Record UUID for sdb1, I took a picture with my phone
+Find UUID of lvm-vg02-data-unlocked
+# ls -al /dev/mapper                                      (locate lvm-vg02-data-unlocked label: dm-4)
+# ls -al /dev/disk/by-uuid
 
-Now we edit the crypttab
+Record UUID for dm-4
+
+Add entry in crypttab
 # nano /mnt/etc/crypttab
 
-Add in this line to auto-unlock /data at boot time:
+Add in this line to auto-unlock lvm-vg02-data at boot time:
+data    UUID=uuid in here   /luks-keys/lvm-vg02-key luks,allow-discard
 
-data    UUID=47ba317e-5eb4-4f79-8692-43759a9004c8   /luks-keys/crypt_drive_02 luks,allow-discard
 
 Generate fstab
 # genfstab -U /mnt >> /mnt/etc/fstab
 
-Add discard option onto /boot, /dev/mapper/lvm_vol_01-root, and swap
-# nano /etc/fstab
+Add discard option onto /boot, /dev/mapper/lvm-vg01-root, and lvm-vg01-swap
+# nano /mnt/etc/fstab
 
-------------------------------------------------------------------------
-Part06: Chrooting into the system and configuring for first boot
-------------------------------------------------------------------------
 
 # arch-chroot /mnt                                      (chrooting into system)
 
@@ -159,8 +169,10 @@ HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems
 Generate initial ramdisk environment
 # mkinitcpio -p linux
 
+Add discard option for SSD trim in /etc/lvm/lvm.conf
+# nano /etc/lvm/lvm.conf   --> issue_discards = 1
 Set Password for root
-# passwd strong_password
+# passwd
 
 Create User
 # useradd -m -G wheel,storage,audio,power -s /bin/bash username
@@ -189,9 +201,10 @@ Add entries and kermel options
 Add the following:
 
 title	[[ Arch Linux ]]                                  ( Could basically write anything here, title will show up on boot)
-linux	/vmlinuz-linux
+linux /vmlinuz-linux
+initrd  /intel-ucode.img  
 initrd  /initramfs-linux.img
-options	cryptdevice=/dev/sda2:crypt_drive_01 root=/dev/mapper/lvm_vol_01-root resume=/dev/mapper/lvm_vol_01-swap rw
+options	cryptdevice=/dev/sda2:crypt-disk01 root=/dev/mapper/lvm--vg01-root resume=/dev/mapper/lvm--vg01-swap rw quiet
 
 Installation Complete. Remove USB installation media and reboot 
 # reboot
