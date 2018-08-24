@@ -1,20 +1,21 @@
 Arch Linux Post Install
 
+Pacman settings
+sudo nano /etc/pacman.conf
 
-pacman setup
-# pacman-key --init
-# pacman-key --populate archlinu
-
+Enable 32bit repo [once steam get's 64bit this repo will be uncessary]
 uncomment color option /etc/pacman.conf and uncomment [multilib] repo
 
 Add AUR repo
-
+------------------------------------------
 [archlinuxfr]
 SigLevel = Never
 Server = http://repo.archlinux.fr/$arch
+------------------------------------------
 
-
-
+Initiate pacman gpg keys
+# pacman-key --init
+# pacman-key --populate archlinu
 
 
 
@@ -27,7 +28,6 @@ Install another AUR helper
 # yay -S pikaur
 
 Rankmirrors
-
 # yay -S pacman-contrib
 Back up the existing /etc/pacman.d/mirrorlist: 
 # cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
@@ -40,6 +40,22 @@ Rank the mirrors, here with the operand -n 6 to only output the 6 fastest mirror
 
 Sync mirrors
 # yay -Syy
+
+Automatically clean the package cache after every pacman transaction.
+# sudo nano /etc/pacman.d/hooks/clean_package_cache.hook
+---------------------------------------------
+[Trigger]
+Operation = Upgrade
+Operation = Install
+Operation = Remove
+Type = Package
+Target = *
+[Action]
+Description = Cleaning pacman cache...
+When = PostTransaction
+Exec = /usr/bin/paccache -r
+--------------------------------------------
+
 
 
 Using Reflector to rank mirrors
