@@ -14,6 +14,10 @@ SigLevel = Never
 Server = http://repo.archlinux.fr/$arch
 
 
+
+
+
+
 Install yay AUR helper
 # git clone https://aur.archlinux.org/yay.git
 # cd yay
@@ -22,6 +26,70 @@ Install yay AUR helper
 Install another AUR helper
 # yay -S pikaur
 
+Rankmirrors
+
+# yay -S pacman-contrib
+Back up the existing /etc/pacman.d/mirrorlist: 
+# cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+To uncomment every mirror, run the following sed line: 
+# sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup
+
+Rank the mirrors, here with the operand -n 6 to only output the 6 fastest mirrors: 
+# rankmirrors -n 6 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist
+
+Sync mirrors
+# yay -Syy
+
+
+Using Reflector to rank mirrors
+# yay -S reflector
+
+Back up the existing /etc/pacman.d/mirrorlist: 
+# cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+Verbosely rate and sort the five most recently synchronized mirrors by download speed, and overwrite the file /etc/pacman.d/mirrorlist: 
+# reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+
+
+Pacman hook
+Create a pacman hook that will run reflector and remove the .pacnew file created every time pacman-mirrorlist gets an upgrade. 
+# mkdir /etc/pacman.d/hooks
+# nano /etc/pacman.d/hooks/mirrorupgrade.hook
+-------------------------------------------------------------------------------
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = pacman-mirrorlist
+
+[Action]
+Description = Updating pacman-mirrorlist with reflector and removing pacnew...
+When = PostTransaction
+Depends = reflector
+Exec = /bin/sh -c "reflector --country 'United States' --latest 200 --age 24 --sort rate --save /etc/pacman.d/mirrorlist; rm -f /etc/pacman.d/mirrorlist.pacnew"
+--------------------------------------------------------------------------------
+
+Systemd service
+
+This is an example of service unit that waits for the network to be up and online before running reflector: 
+# nano /etc/systemd/system/reflector.service
+--------------------------------------------------------------------------------
+[Unit]
+Description=Pacman mirrorlist update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/reflector --protocol https --latest 30 --number 20 --sort rate --save /etc/pacman.d/mirrorlist
+
+[Install]
+RequiredBy=multi-user.target
+-----------------------------------------------------------------------------------
+
+Enable/Start service
+# systemctl enable reflector.service
+# systemctl start reflector.service
 
 xwindow
 # sudo pacman -S xorg xorg-server xf86-input-libinput xf86-video-intel xorg-xinit xterm xorg-xclock xorg-twm git
@@ -143,7 +211,7 @@ dnssec-check-unsigned
 ---------------------------------------------------
 
 Installing and configure Samba
-# sudo pacman -S samba
+# sudo pacman -S samba kdenetwork-filesharing gvfs-smb
 
 Create /etc/samba/smb.conf and add the following default values:
 -----------------------------------------------------------------------------------------------------
@@ -382,26 +450,59 @@ Enable/Start the service
 # sudo systemctl enable smb.service
 # sudo systemctl enable nmb.service
 
-System Programs
+Programs
 # sudo yay -S htop ntfs-3g git btrfs-progs firefox thunar gvfs thunar-archive-plugin thunar-media-tags-plugin thunar-shares-plugin raw-thumbnailer ffmpegthumbnailer
 
+# yay -S chromium pepper-flash chromium-widevine
+
+Make sure Flash is allowed to run in chrome://settings/content/flash
+Make sure Allow sites to play protected content is checked in chrome://settings/content/protectedContent
 
 
+Printing
+
+yay -S printer-manager cups hplip-minimal
 
 
+VlC
+# yay -S phonon-qt5-vlc libva-intel-driver ttf-freefont
 
 
+Priivate Internet Access - download pia tar and install
 
 
+CLI system information tool
+# yay -S neofetch-git w3m imagemagick
 
+place neofetch command in ~/.bashrc
+neofetch --w3m --source /home/nickle/Photos/pictures/karmen.jpg
 
+Bittorrent Software
 
+# yay -S deluge python2-notify pygtk python2-mako
 
+Filesystems Tools
 
+# yay -S gparted exfat-utils gpart
 
+Skype
+# yay -S skypeforlinux-stable-bin 
 
+ynab4
+# yay -S ynab4
 
+Dropbox
+# yay -S dropbox
 
+Dropbox Kde Client
+# yay -S kfilebox
 
+Install login theme
+# yay sddm
 
+Youtube downloader
+# yay -S clipgrab-qt5
+
+Kde dock app
+# yay -S latte-dock
 
