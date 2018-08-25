@@ -1,2 +1,3 @@
 # Arch-Linux-Install-t450s
-My installation notes/process on installing Arch Linux with disk encryption.
+
+<b>My installation notes/process on installing Arch Linux with disk encryption.<b>
