@@ -18,6 +18,8 @@ Creating Patitions and planning layout
 
 List availale block devices
 # lsblk
+# blkid
+
 
 Create boot partition and lvm-vg01 swap and root for 500gb ssd. Lvm on luks will allow the encrypt hook to decrypt both root and swap
 for hibernation/resume from suspend.
