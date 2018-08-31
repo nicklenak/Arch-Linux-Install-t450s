@@ -1,0 +1,152 @@
+Display Manager
+# yay -S sddm sddm-config-editor-git
+
+SDDM themes
+# yay -S archlinux-themes-sddm
+
+Network Manager
+# yay -S networkmanager network-manager-applet
+# systemctl enable NetworkManager.service
+
+Enable HiDPI
+# nano /etc/sddm.conf.d/hidpi.conf
+--------------------------------------
+[Wayland]
+EnableHiDPI=true
+
+[X11]
+EnableHiDPI=true
+--------------------------------------
+
+XFCE4
+# yay -S xfce4 xfce4-goodies light-locker xfce4-power-manager libcanberra libcanberra-plus 
+         xfce4-pulseaudio-pligin ttf-droid ttf-dejavu
+Lidlock control in powermanager
+# xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/logind-handle-lid-switch -s false
+------------------------------------------------------------------------------------------------
+KDE PLasma
+# yay -S plasma kde-applications latte-dock
+
+GTK+ Themes
+# yay -S breeze-gtk gnome-breeze-git
+
+Disable panel shadow
+# yay -S xorg-xprop
+and run
+# xprop -remove _KDE_NET_WM_SHADOW
+then select the panel with the plus-sized cursor
+
+Thumbnail generation
+# yay -S kdegraphics-thumbnailers ffmpegthumbs kde-thumbnailer-odf
+
+Power saving
+# yay -S powerdevil
+--------------------------------------------------------------------------------------------
+Gnome
+# yay -S gnome gnome-extra gnome-shell-extensions
+
+Managing Autostart
+# yay -S gnome-tweaks
+
+Power
+When you are using a laptop you might want to alter the following settings: 
+# gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 3600
+# gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type hibernate
+# gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 1800
+# gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type hibernate
+# gsettings set org.gnome.settings-daemon.plugins.power power-button-action suspend
+# gsettings set org.gnome.desktop.lockdown disable-lock-screen true
+
+Configure behaviour on lid switch close
+ Checking the setting creates 
+ ~/.config/autostart/ignore-lid-switch-tweak.desktop 
+ which will autostart the Tweaks's inhibitor. 
+
+Change critical battery level action
+# nano /etc/UPower/UPower.conf
+-----------------------------------
+PercentageLow=10
+PercentageCritical=3
+PercentageAction=2
+CriticalPowerAction=HybridSleep
+-----------------------------------
+
+Budgie Desktop
+# yay -S budgie-desktop
+
+Recommended to install gnome group if not installed already
+
+Choose Budgie Desktop session from a display manager of choice, or modify xinitrc to include Budgie Desktop:
+----------------------------------------------
+export XDG_CURRENT_DESKTOP=Budgie:GNOME
+exec budgie-desktop
+----------------------------------------------
+
+Configuration of Budgie Desktop is done through the sidebar
+and changes to system settings are made through gnome-control-center 
+
+Cinnamon
+# yay -S cinnamon
+
+Cinnamon settings
+# cinnamon-settings panel
+
+To list all available modules:
+# pacman -Ql cinnamon | awk -F'[_.]' '/cs_.+\.py/ {print $2}'
+
+Printers
+# system-config-printer
+
+Bluetooth
+# yay -S blueberry
+
+Applets and extensions
+# cinnamon-settings applets
+# cinnamon-settings extensions
+
+Adding more workspaces
+# gsettings set org.cinnamon.desktop.wm.preferences num-workspaces 4
+
+Hide desktop icons
+# gsettings set org.nemo.desktop show-desktop-icons false
+
+Deepen Desktop 
+# yay -S deepin deepin-extra
+
+start via xinit
+# nano ~/.xinitrc
+--------------
+exec startdde
+--------------
+
+MATE Desktop
+# yay -S mate mate-extra mate-applet-dock mate-applet-streamer mate-menu mate-tweak brisk-menu mate-media
+         mate-screensaver-hacks
+
+To disable the notification on battery discharge, run: 
+# gsettings set org.mate.power-manager.notify-discharging false
+
+Compositing is not enabled by default. To enable it navigate to run 
+System > Preferences > Look and Feel > Windows > General 
+and click the tick box alongside Enable software compositing window manager. 
+Alternatively, you can run the following from the terminal: 
+# gsettings set org.mate.Marco.general compositing-manager true
+
+Enable new window centering
+By default, new windows are placed in the top-left corner. To center new windows on creation navigate to run 
+System > Preferences > Windows > Placement and click the tick box alongside Center new windows. 
+Alternatively, you can run the following from the terminal: 
+# gsettings set org.mate.Marco.general center-new-windows true
+
+Enabling window snapping
+Window snapping is not be enabled by default, to enable it navigate to run System > Preferences > Windows > Placement 
+and click the tick box alongside Enable side by side tiling. 
+Alternatively, you can run the following from the terminal:
+# gsettings set org.mate.background show-desktop-icons false
+
+
+
+
+
+
+
