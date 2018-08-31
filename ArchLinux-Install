@@ -14,7 +14,10 @@ Goal: Install Arch Linux enabling encryption on all drive and enabling hibernati
 Creating Patitions and planning layout
 ------------------------------------------------------------------------
 -Using GPT partition table
--Drives should be wiped and zeroed using Ultimate Boot CD
+-Drives should be wiped and zeroed using Ultimate Boot CD (gui)
+ or dd
+ # dd if=/dev/zero of=/dev/sdX bs=512 status=progress
+ 
 
 List availale block devices
 # lsblk
